@@ -194,3 +194,6 @@ LOGGING = {
         },
     }
 }
+
+# 替换系统的User来使用我们自己定义的User
+AUTH_USER_MODEL = 'users.User'
