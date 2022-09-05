@@ -1,9 +1,15 @@
 from django.shortcuts import render
 from django.views import View
-from django.http.response import HttpResponseBadRequest
+from django.http.response import HttpResponseBadRequest, JsonResponse
 from libs.captcha.captcha import captcha
 from django_redis import get_redis_connection
 from django.http import HttpResponse
+from utils.response_code import RETCODE
+import logging
+from random import randint
+from libs.yuntongxun.sms import CCP
+
+logger = logging.getLogger('django')
 
 
 # Create your views here.
@@ -41,3 +47,56 @@ class ImageCodeView(View):
         redis_conn.setex('img:%s'%uuid, 300, text)
 
         return HttpResponse(image, content_type='image/jpeg')
+
+
+# 短信验证码视图
+class SmsCodeView(View):
+
+    def get(self, request):
+        """
+        1. 接收参数
+        2. 参数的验证
+            2.1 参数是否齐全（mobile, image_code, uuid）
+            2.2 图片验证码的验证：
+                链接redis， 获取redis中的图片验证码；
+                判断图片验证码是否存在；
+                如果图片验证码未过期，我们获取到之后就可以删除图片验证码；
+                比对图片验证码
+        3. 生成短信验证码
+        4. 保存短信验证码到redis中
+        5. 发送短信
+        6. 返回相应，前端开始计时
+        :param request:
+        :return:
+        """
+
+        mobile = request.GET.get('mobile')
+        image_code = request.GET.get('image_code')
+        uuid = request.GET.get('uuid')
+
+        if not all([mobile, image_code, uuid]):
+            return JsonResponse({'code': RETCODE.NECESSARYPARAMERR, 'errmsg': '缺少必传参数'})
+
+        redis_conn = get_redis_connection('default')
+        redis_image_code = redis_conn.get('img:%s'%uuid)
+
+        if redis_image_code is None:
+            return JsonResponse({'code': RETCODE.IMAGECODEERR, 'errmsg': '图形验证码失效'})
+
+        try:
+            redis_conn.delete('img:%s'%uuid)
+        except Exception as e:
+            logger.error(e)
+
+        if image_code.lower() != redis_image_code.decode().lower():
+            return JsonResponse({'code': RETCODE.IMAGECODEERR, 'errmsg':'输入图形验证码有误'})
+
+        sms_code = '%06d'%randint(0, 999999)
+        logger.info(sms_code)
+
+        redis_conn.setex('sms:%s'%mobile, 300, sms_code)
+
+        CCP().send_template_sms('1', mobile, [sms_code, '5'])
+
+        return JsonResponse({'code': RETCODE.OK, 'errmsg': '发送短信成功'})
+
