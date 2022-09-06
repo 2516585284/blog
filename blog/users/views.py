@@ -1,3 +1,5 @@
+import re
+
 from django.shortcuts import render
 from django.views import View
 from django.http.response import HttpResponseBadRequest, JsonResponse
@@ -8,6 +10,8 @@ from utils.response_code import RETCODE
 import logging
 from random import randint
 from libs.yuntongxun.sms import CCP
+from users.models import User
+from django.db import DatabaseError
 
 logger = logging.getLogger('django')
 
@@ -19,6 +23,56 @@ class RegisterView(View):
     def get(self, request):
 
         return render(request, 'register.html')
+
+    def post(self, request):
+        """
+        1. 接收前端传递过来的参数(手机号，密码，确认密码，短信验证码)
+        2. 验证参数
+            2.1 验证参数是否齐全
+            2.2 手机号格式是否正确
+            2.3 密码是否符合格式
+            2.4 密码和确认密码要一致
+            2.5 短信验证码是否和redis中的一致
+        3. 保存注册信息
+        4. 返回响应，跳转到指定页面
+        :param request:
+        :return:
+        """
+        mobile = request.POST.get('mobile')
+        password = request.POST.get('password')
+        password2 = request.POST.get('password2')
+        smscode = request.POST.get('sms_code')
+
+        if not all([mobile, password, password2, smscode]):
+            return HttpResponseBadRequest('缺少必要的参数')
+
+        if not re.match(r'^1[3-9]\d{9}$', mobile):
+            return HttpResponseBadRequest('手机号不符合规则')
+
+        if not re.match(r'^[0-9a-zA-z]{8,20}$', password):
+            return HttpResponseBadRequest('请输入8-20位密码，密码是数字，字母')
+
+        if password != password2:
+            return HttpResponseBadRequest('两次密码不一致')
+
+        redis_conn = get_redis_connection('default')
+        redis_sms_code = redis_conn.get('sms:%s'%mobile)
+
+        if redis_sms_code is None:
+            return HttpResponseBadRequest('短信验证码已过期')
+
+        if redis_sms_code.decode() != smscode:
+            return HttpResponseBadRequest('短信验证码不一致')
+
+        # 创建新用户并插入数据库
+        try:
+            # create_user()可以使用系统的方法来对密码进行加密
+            user = User.objects.create_user(username=mobile, mobile=mobile, password=password)
+        except DatabaseError as e:
+            logger.error(e)
+            return HttpResponseBadRequest('注册失败')
+
+        return HttpResponse('注册成功，重定向到首页')
 
 
 # 图片验证码试图
