@@ -73,9 +73,17 @@ class RegisterView(View):
             logger.error(e)
             return HttpResponseBadRequest('注册失败')
 
+        from django.contrib.auth import login
+        login(request, user)
+
         # return HttpResponse('注册成功，重定向到首页')
         # reverse（）可以通过namespace:name来获取到视图所对应的路由
-        return redirect(reverse('home:index'))
+        response = redirect(reverse('home:index'))
+
+        response.set_cookie('is_login', True)
+        response.set_cookie('username', user.username, 7*24*3600)
+
+        return response
 
 
 # 图片验证码试图
