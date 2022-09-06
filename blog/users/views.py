@@ -1,6 +1,7 @@
 import re
 
-from django.shortcuts import render
+from django.shortcuts import render,redirect
+from django.urls import reverse
 from django.views import View
 from django.http.response import HttpResponseBadRequest, JsonResponse
 from libs.captcha.captcha import captcha
@@ -72,7 +73,9 @@ class RegisterView(View):
             logger.error(e)
             return HttpResponseBadRequest('注册失败')
 
-        return HttpResponse('注册成功，重定向到首页')
+        # return HttpResponse('注册成功，重定向到首页')
+        # reverse（）可以通过namespace:name来获取到视图所对应的路由
+        return redirect(reverse('home:index'))
 
 
 # 图片验证码试图
