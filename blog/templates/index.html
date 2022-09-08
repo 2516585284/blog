@@ -29,7 +29,7 @@
     <div class="container">
         <!-- 导航栏商标 -->
         <div>
-            <a class="navbar-brand" href="./index.html">个人博客</a>
+            <a class="navbar-brand" href="{% url 'home:index' %}">个人博客</a>
         </div>
         <!-- 分类 -->
         <div class="collapse navbar-collapse">
@@ -60,12 +60,12 @@
                     <div class="dropdown-menu" aria-labelledby="navbarDropdown" style="display: block" v-show="show_menu">
                         <a class="dropdown-item" href="../static/write_blog.html">写文章</a>
                         <a class="dropdown-item" href='../static/center.html'>个人信息</a>
-                        <a class="dropdown-item" href='#'>退出登录</a>
+                        <a class="dropdown-item" href='{% url 'users:logout' %}'>退出登录</a>
                     </div>
                 </li>
                 <!-- 如果用户未登录，则显示登录按钮 -->
                 <li class="nav-item" v-else>
-                    <a class="nav-link" href="login.html">登录</a>
+                    <a class="nav-link" href="{% url 'users:login' %}">登录</a>
                 </li>
             </ul>
         </div>
@@ -214,7 +214,7 @@
         <!-- 文章内容 -->
         <!-- 标题图 -->
         <div class="col-3">
-            <img src="../static/img/1.jpg" alt="avatar" style="max-width:100%; border-radius: 20px">
+            <img src="{% static 'img/1.jpg' %}" alt="avatar" style="max-width:100%; border-radius: 20px">
         </div>
         <div class="col">
             <!-- 栏目 -->
