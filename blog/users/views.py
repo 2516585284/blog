@@ -242,3 +242,74 @@ class LogoutView(View):
         response.delete_cookie('is_login')
 
         return response
+
+
+class ForgerPasswordView(View):
+
+    def get(self, request):
+
+        return render(request, 'forget_password.html')
+
+
+    def post(self, request):
+        """
+        1.接收数据
+        2.验证数据
+            判断参数是否齐全
+            手机号是否符合规则
+            判断密码是否符合规则
+            判断确认密码和密码是否一致
+            判断短信验证码是否正确
+        3.根据手机号进行用户信息的查询
+        4.如果手机号查询出用户信息则进行用户密码的修改
+        5.如果手机号没有查询出用户信息，则进行新用户的创建
+        6.进行页面跳转，跳转到首页
+        7.返回响应
+        :param request:
+        :return:
+        """
+        mobile = request.POST.get('mobile')
+        password = request.POST.get('password')
+        password2 = request.POST.get('password2')
+        smscode = request.POST.get('sms_code')
+
+        if not all([mobile, password, password2, smscode]):
+            return HttpResponseBadRequest('参数不全')
+
+        if not re.match(r'^1[3-9]\d{9}$', mobile):
+            return HttpResponseBadRequest('手机号不符合规则')
+
+        if not re.match(r'^[0-9a-zA-Z]{8,20}$', password):
+            return HttpResponseBadRequest('密码不符合规则')
+
+        if password != password2:
+            return HttpResponseBadRequest('密码不一致')
+
+        # 验证手机验证码
+        redis_conn = get_redis_connection('default')
+        redis_sms_code = redis_conn.get('sms:%s'%(mobile))
+
+        if redis_sms_code is None:
+            return HttpResponseBadRequest('短信验证码已过期')
+
+        if redis_sms_code.decode() != smscode:
+            return HttpResponseBadRequest('短信验证码错误')
+
+        # 根据手机号查询用户
+        try:
+            user = User.objects.get(mobile=mobile)
+        except User.DoesNotExist:
+            # 注册一个新用户
+            try:
+                User.objects.create_user(username=mobile,mobile=mobile, password=password)
+            except Exception:
+                return HttpResponseBadRequest('修改失败，请稍后再试')
+
+        else:
+            # 修改用户密码
+            user.set_password(password)
+            user.save()
+
+        response = redirect(reverse('users:login'))
+        return response
+
