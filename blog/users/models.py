@@ -16,6 +16,9 @@ class User(AbstractUser):
 
     USERNAME_FIELD = 'mobile'
 
+    # 创建超级管理员必须输入的字段（不包括 手机号和密码）
+    REQUIRED_FIELDS = ['username', 'email']
+
     class Meta:
         db_table = 'tb_users'
         verbose_name = '用户管理'
