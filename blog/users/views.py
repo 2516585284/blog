@@ -211,7 +211,13 @@ class LoginView(View):
         from django.contrib.auth import login
         login(request, user)
 
-        response = redirect(reverse('home:index'))
+        # 根据next参数来进行页面的跳转
+        next_page = request.GET.get('next')
+        if next_page:
+            response = redirect(next_page)
+        else:
+
+            response = redirect(reverse('home:index'))
 
         if remember != 'on':
             request.session.set_expiry(0)
@@ -312,4 +318,45 @@ class ForgerPasswordView(View):
 
         response = redirect(reverse('users:login'))
         return response
+
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+# 如果用户未登录的话，则会进行默认的跳转，默认的跳转链接是accounts/login/?next=/center/
+class UserCenterView(LoginRequiredMixin, View):
+
+    def get(self, request):
+        # 获得登录用户的信息
+        user = request.user
+        # 组织获取用户的信息
+        context = {
+            'username': user.username,
+            'mobile': user.mobile,
+            'avatar': user.avatar.url if user.avatar else None,
+            'user_desc': user.user_desc
+        }
+
+        return render(request, 'center.html', context)
+
+    def post(self, request):
+
+        user = request.user
+        username = request.POST.get('username', user.username)
+        avatar = request.FILES.get('avatar')
+        user_desc = request.POST.get('desc', user.user_desc)
+
+        try:
+            user.username = username
+            user.user_desc = user_desc
+            if avatar:
+                user.avatar = avatar
+            user.save()
+        except Exception as e:
+            logger.error(e)
+            return HttpResponseBadRequest('修改失败，请稍后再试')
+
+        response = redirect(reverse('users:center'))
+
+        response.set_cookie('username', user.username, max_age=14*24*3600)
+        return response
+
 
